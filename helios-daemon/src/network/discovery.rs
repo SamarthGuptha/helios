@@ -7,7 +7,7 @@ pub fn start_mdns(port: u16) -> Result<ServiceDaemon, mdns_sd:: Error> {
     let mdns = ServiceDaemon::new()?;
     let instance_name = format!("helios-node-{}", uuid::Uuid::new_v4().as_simple());
 
-    let ip = "192.168.56.1";
+    let ip = "0.0.0.0"; //replace with your IP :D
 
     let service_info = ServiceInfo::new(
         SERVICE_TYPE,

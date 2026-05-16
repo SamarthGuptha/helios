@@ -1,7 +1,7 @@
 use std::os::windows::io::AsRawHandle;
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectA, SetInformationJobObject,
+    AssignProcessToJobObject, SetInformationJobObject,
     JobObjectExtendedLimitInformation, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
 };
@@ -13,24 +13,22 @@ pub struct SandboxJob {
 impl SandboxJob {
     pub fn new() -> Result<Self, String> {
         unsafe {
-            let handle = CreateJobObject(None, None)
+            let handle = windows::Win32::System::JobObjects::CreateJobObjectA(None, None)
                 .map_err(|e| format!("Failed to create Windows Job Object: {}", e))?;
+            let mut limit_info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+            limit_info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
 
-             let mut limit_info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-             limit_info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-
-             SetInformationJobObject(
+            SetInformationJobObject(
                 handle,
                 JobObjectExtendedLimitInformation,
                 &limit_info as *const _ as *const core::ffi::c_void,
                 std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-
-             ).map_err(|e| {
+            ).map_err(|e| {
                 let _ = CloseHandle(handle);
                 format!("Failed to enforce Job Object limits: {}", e)
-             })?;
+            })?;
 
-             Ok(Self { handle })
+            Ok(Self { handle })
         }
     }
     pub fn assign_process(&self, process: &std::process::Child) -> Result<(), String> {
@@ -40,7 +38,6 @@ impl SandboxJob {
                 .map_err(|e| format!("Failed to bind process to Sandbox: {}", e))
         }
     }
-
 }
 
 impl Drop for SandboxJob {

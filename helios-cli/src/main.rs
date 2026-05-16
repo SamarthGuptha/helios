@@ -1,26 +1,37 @@
+use std::path::Path;
 use windows::core::PCSTR;
 use windows::Win32::Foundation::{CloseHandle, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE};
-use windows::Win32::Storage::FileSystem::{CreateFileA, ReadFile, WriteFile, OPEN_EXISTING};
+use windows::Win32::Storage::FileSystem::{
+    CreateFileA, ReadFile, WriteFile, OPEN_EXISTING, FILE_FLAGS_AND_ATTRIBUTES, FILE_SHARE_MODE,
+};
 use windows::Win32::System::Pipes::{WaitNamedPipeA, NMPWAIT_USE_DEFAULT_WAIT};
 
 const PIPE_NAME: &str = "\\\\.\\pipe\\helios_ipc\0";
 
 fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let payload = if args.is_empty() { "ping".to_string() } else { args.join(" ") };
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    if args.len() >= 2 {
+        let file_path = Path::new(&args[1]);
+        if let Ok(absolute_path) = std::fs::canonicalize(file_path) {
+            let clean_path = absolute_path.to_string_lossy().replace("\\\\?\\", "");
+            args[1] = clean_path;
+        }
+    }
 
+    let payload = if args.is_empty() { "ping".to_string() } else { args.join(" ") };
     unsafe {
         if WaitNamedPipeA(PCSTR(PIPE_NAME.as_ptr()), NMPWAIT_USE_DEFAULT_WAIT).is_err() {
-            eprintln!("Daemon not running");
+            eprintln!("Daemon not running.");
             std::process::exit(1);
         }
+
         let pipe_handle = CreateFileA(
             PCSTR(PIPE_NAME.as_ptr()),
             GENERIC_READ.0 | GENERIC_WRITE.0,
-            0,
+            FILE_SHARE_MODE(0),
             None,
             OPEN_EXISTING,
-            0,
+            FILE_FLAGS_AND_ATTRIBUTES(0),
             None,
         ).expect("Failed to connect to pipe");
 
@@ -28,6 +39,7 @@ fn main() {
             eprintln!("Invalid handle");
             std::process::exit(1);
         }
+
         let mut bytes_written = 0;
         WriteFile(pipe_handle, Some(payload.as_bytes()), Some(&mut bytes_written), None).unwrap();
 

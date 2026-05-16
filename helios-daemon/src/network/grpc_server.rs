@@ -1,10 +1,10 @@
 use helios_proto::distributed_compiler_server::DistributedCompiler;
-use helios_proto::{Compile_Response, CompileTask, NodeInfo, NodeStatus};
+use helios_proto::{CompileResponse, CompileTask, NodeInfo, NodeStatus};
 use tonic::{Request, Response, Status};
 use std::fs;
 use std::time::Instant;
 
-#[derive(default)]
+#[derive(Default)]
 pub struct HeliosCompilerService;
 
 #[tonic::async_trait]
@@ -13,15 +13,14 @@ impl DistributedCompiler for HeliosCompilerService {
         &self,
         request: Request<CompileTask>,
     ) -> Result<Response<CompileResponse>, Status> {
-        let request = request.into_inner();
-        println!("gRPC: Received request: {}", req.task_id);
+        let req = request.into_inner();
+        println!("gRPC: Received task {}", req.task_id);
+
         let start_time = Instant::now();
         let task_id = req.task_id.clone();
-
-        let response = tokio::task::spawn_blocking(move || {
+        let response = tokio::task::spawn_blocking(move || -> CompileResponse {
             let temp_dir = std::env::temp_dir().join(format!("helios_task_{}", task_id));
             let _ = fs::create_dir_all(&temp_dir);
-
             let source_path = temp_dir.join(&req.source_filename);
             let _ = fs::write(&source_path, &req.source_content);
             let compiler_exe = if req.compiler_version.is_empty() {
@@ -29,16 +28,13 @@ impl DistributedCompiler for HeliosCompilerService {
             } else {
                 req.compiler_version.clone()
             };
-
             let mut args = req.compiler_flags.clone();
             args.push(source_path.to_string_lossy().to_string());
-
             let obj_filename = format!("{}.o", req.source_filename);
             let obj_path = temp_dir.join(&obj_filename);
             args.push("-o".to_string());
             args.push(obj_path.to_string_lossy().to_string());
-
-            let (exit_code, stdout, stderr) = crate::execution::executor::executor_compiler_task(
+            let (exit_code, stdout, stderr) = crate::execution::executor::execute_compiler_task(
                 &compiler_exe,
                 &args,
             ).unwrap_or((-1, String::new(), "Failed to execute compiler sandbox".to_string()));

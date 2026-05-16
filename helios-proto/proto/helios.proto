@@ -1,33 +1,41 @@
 syntax = "proto3";
-package helios;
-service DistributedCompiler {
-    rpc DispatchTask (CompileTask) returns (CompileResponse);
-    rpc Ping (NodeInfo) returns (NodeStatus);
 
+package helios;
+
+// The core P2P service exposed by every Helios Daemon on the network
+service DistributedCompiler {
+    // Dispatches a compilation task to a peer and streams back the result
+    rpc DispatchTask (CompileTask) returns (CompileResponse);
+
+    // Health check and capability reporting for mDNS peer validation
+    rpc Ping (NodeInfo) returns (NodeStatus);
 }
+
 message CompileTask {
-    string task_id = 1;
-    string source_filename = 2;
-    bytes source_content = 3;
-    repeated string compiler_flags = 4;
-    string compiler_version = 5;
-    string target_triple = 6;
-    map<string, string> env_vars = 7;
+    string task_id = 1;                 // Unique UUID for the build task
+    string source_filename = 2;         // e.g., "main.cpp" or "lib.rs"
+    bytes source_content = 3;           // The raw source code buffer
+    repeated string compiler_flags = 4; // Arguments passed to the compiler
+    string compiler_version = 5;        // Ensure peers use the same toolchain (e.g., "msvc-14.38" or "rustc-1.75")
+    string target_triple = 6;           // e.g., "x86_64-pc-windows-msvc"
+    map<string, string> env_vars = 7;   // Required environment variables for the compilation context
 }
 
 message CompileResponse {
     string task_id = 1;
-    int32 exit_code = 2;
-    bytes object_file = 3;
-    string stdout_logs = 4;
-    string stderr_logs = 5;
-    uint64 duration_ms = 6;
+    int32 exit_code = 2;                // 0 for success, non-zero for compiler error
+    bytes object_file = 3;              // The compiled artifact (.obj, .o, or .rlib buffer)
+    string stdout_logs = 4;             // Standard output from the compiler
+    string stderr_logs = 5;             // Error logs (warnings/errors)
+    uint64 duration_ms = 6;             // Compilation time metric
 }
+
 message NodeInfo {
     string node_id = 1;
 }
+
 message NodeStatus {
-    bool accepts_tasks = 1;
-    uint32 active_jobs = 2;
-    uint32 max_concurrency = 3;
+    bool accepts_tasks = 1;             // Is the peer currently overloaded?
+    uint32 active_jobs = 2;             // Current CPU load
+    uint32 max_concurrency = 3;         // Max hardware threads allocated to Helios
 }

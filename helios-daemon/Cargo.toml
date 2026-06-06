@@ -3,12 +3,13 @@ name = "helios-daemon"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "helios-daemon"
+path = "src/main.rs"
+
 [dependencies]
 tokio.workspace = true
 windows.workspace = true
 tonic.workspace = true
-prost.workspace = true
-helios-proto = { path = "../helios-proto"}
-mdns-sd = "0.4"
-uuid = { version = "1.6", features = ["v4"] }
-imgui.workspace = true
+helios-proto = { path = "../helios-proto" }
+uuid = {version = "1.6", features = ["v4"]}
